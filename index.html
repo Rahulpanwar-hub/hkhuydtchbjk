@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rotational Motion — Immersive Interactive Physics Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-main: #070d1a;
+      --bg-panel: rgba(13, 23, 42, 0.86);
+      --border-glass: rgba(56, 189, 248, 0.22);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+    body.light-theme {
+      --bg-main: #f1f5f9;
+      --bg-panel: rgba(255, 255, 255, 0.92);
+      --border-glass: rgba(37, 99, 235, 0.2);
+      --text-main: #0f172a;
+      --text-muted: #475569;
+    }
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: background 0.25s ease, color 0.25s ease;
+    }
+    .glass-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glass);
+      backdrop-filter: blur(12px);
+    }
+    input[type="range"] {
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+    .canvas-wrap {
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- TOP LABORATORY HEADER -->
+  <header class="glass-card sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500/25 to-violet-500/25 text-2xl ring-1 ring-sky-400/40">
+        🎡
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-extrabold tracking-tight sm:text-xl">Rotational Motion Lab</h1>
+          <span class="rounded-full bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold text-sky-400 ring-1 ring-sky-400/30">
+            Class 9–11 Physics
+          </span>
+        </div>
+        <p class="text-xs opacity-75">
+          Interactive Rotational Dynamics, Torque, Moment of Inertia, Angular Momentum &amp; Precession
+        </p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="toggleTheme()" id="btnTheme" class="rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-1.5 text-xs font-bold hover:bg-sky-500/20 transition">
+        ☀️ Light / Dark
+      </button>
+      <button onclick="toggleFullscreenLab()" class="rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-1.5 text-xs font-bold hover:bg-sky-500/20 transition">
+        ⛶ Fullscreen
+      </button>
+      <button onclick="resetCurrentExperiment()" class="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-blue-500 transition">
+        ↺ Reset Exp
+      </button>
+    </div>
+  </header>
+
+  <!-- EXPERIMENT SELECTOR BAR (10 EXPERIMENTS) -->
+  <nav class="mx-auto max-w-[1440px] px-3 pt-3">
+    <div id="experimentTabs" class="flex gap-1.5 overflow-x-auto pb-2"></div>
+  </nav>
+
+  <!-- MAIN WORKSPACE -->
+  <main id="labRoot" class="mx-auto max-w-[1440px] space-y-4 px-3 pb-8">
+
+    <!-- PRIMARY VIEWPORT + PLAYBACK BAR -->
+    <section class="glass-card rounded-2xl p-3 sm:p-4 shadow-xl">
+      <div class="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 id="expTitle" class="text-base font-extrabold text-sky-400 sm:text-lg">1. Rotating Disc / Circular Motion</h2>
+          <p id="expSubtitle" class="text-xs opacity-75">Angular kinematics (θ, ω), tangential speed v = rω, and centripetal acceleration aₙ = rω²</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <span class="rounded-md bg-emerald-500/15 px-2.5 py-1 text-emerald-400">● v / ω</span>
+          <span class="rounded-md bg-amber-500/15 px-2.5 py-1 text-amber-400">● Torque τ / aₙ</span>
+          <span class="rounded-md bg-violet-500/15 px-2.5 py-1 text-violet-400">● Angular Momentum L / α</span>
+        </div>
+      </div>
+
+      <!-- INTERACTIVE 3D-STYLED CANVAS STAGE -->
+      <div class="canvas-wrap relative overflow-hidden rounded-xl border border-slate-700/60 bg-slate-950">
+        <canvas id="simCanvas" width="1180" height="430" class="block w-full cursor-pointer"></canvas>
+
+        <!-- ZOOM & VIEW HUD OVERLAY -->
+        <div class="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-slate-900/85 px-2 py-1 text-xs font-bold text-slate-200 ring-1 ring-white/15">
+          <button onclick="adjustZoom(0.15)" class="rounded px-1.5 py-0.5 hover:bg-white/10">+</button>
+          <span id="txtZoom" class="px-1 font-mono">100%</span>
+          <button onclick="adjustZoom(-0.15)" class="rounded px-1.5 py-0.5 hover:bg-white/10">−</button>
+          <button onclick="resetZoom()" class="rounded px-1.5 py-0.5 text-[11px] text-sky-400 hover:bg-white/10">Reset</button>
+        </div>
+      </div>
+
+      <!-- TRANSPORT & SPEED BAR -->
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/40 bg-slate-900/45 p-2.5">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnPlayPause" onclick="togglePlay()" class="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 transition">
+            Ⅱ Pause
+          </button>
+          <button onclick="stepForward()" class="rounded-lg border border-slate-600/60 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-100 hover:bg-slate-700 transition">
+            Step +
+          </button>
+          <button onclick="resetCurrentExperiment()" class="rounded-lg border border-slate-600/60 bg-slate-800/80 px-3 py-1.5 text-xs font-bold text-slate-100 hover:bg-slate-700 transition">
+            ↺ Reset
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <label class="font-bold opacity-80">Speed:</label>
+          <select id="selSpeed" onchange="simState.speed = parseFloat(this.value)" class="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1 font-bold text-sky-300">
+            <option value="0.25">0.25x</option>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+
+          <span id="txtSimTime" class="rounded-md bg-slate-800/90 px-2.5 py-1 font-mono font-bold text-amber-300">
+            t = 0.00 s
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLS + TELEMETRY CARDS + LIVE EQUATIONS -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <!-- DYNAMIC EXPERIMENT CONTROLS & VECTOR TOGGLES -->
+      <section class="glass-card rounded-2xl p-4 shadow-lg">
+        <h3 class="mb-3 border-b border-slate-700/40 pb-2 text-sm font-extrabold uppercase tracking-wider text-sky-400">
+          🎛 Experiment Controls
+        </h3>
+        <div id="dynamicControls" class="space-y-3.5 text-xs"></div>
+
+        <!-- INDEPENDENT VECTOR VISIBILITY TOGGLES -->
+        <div class="mt-4 border-t border-slate-700/40 pt-3">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-violet-400">Vector Overlays</span>
+            <button onclick="toggleAllVectors()" class="text-[11px] font-bold text-sky-400 hover:underline">Toggle All</button>
+          </div>
+          <div id="vectorToggles" class="grid grid-cols-2 gap-1.5 text-xs"></div>
+        </div>
+      </section>
+
+      <!-- REAL-TIME ROTATIONAL TELEMETRY DASHBOARD -->
+      <section class="glass-card rounded-2xl p-4 shadow-lg">
+        <h3 class="mb-3 border-b border-slate-700/40 pb-2 text-sm font-extrabold uppercase tracking-wider text-emerald-400">
+          📊 Live Rotational Telemetry
+        </h3>
+        <div id="telemetryGrid" class="grid grid-cols-2 gap-2.5 text-xs"></div>
+      </section>
+
+      <!-- LIVE MATHEMATICAL DERIVATIONS -->
+      <section class="glass-card rounded-2xl p-4 shadow-lg">
+        <h3 class="mb-3 border-b border-slate-700/40 pb-2 text-sm font-extrabold uppercase tracking-wider text-amber-400">
+          🧮 Live Physics Equations
+        </h3>
+        <div id="equationsPanel" class="space-y-2.5 font-mono text-xs leading-5"></div>
+      </section>
+    </div>
+
+    <!-- LIVE REAL-TIME GRAPHS -->
+    <section id="graphsSection" class="glass-card rounded-2xl p-4 shadow-lg">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-sm font-extrabold uppercase tracking-wider text-sky-400">
+          📈 Live Time-Series Graphs (ω, θ, α, τ, KE_rot)
+        </h3>
+        <button onclick="toggleGraphsSection()" class="text-xs font-bold text-slate-400 hover:text-sky-400">
+          Hide / Show
+        </button>
+      </div>
+      <div id="graphsGrid" class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/60 p-2">
+          <div class="mb-1 text-[11px] font-bold text-emerald-400">Angular Velocity ω (rad/s)</div>
+          <canvas id="gOmega" width="220" height="110" class="w-full"></canvas>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/60 p-2">
+          <div class="mb-1 text-[11px] font-bold text-sky-400">Angular Disp. θ (rad)</div>
+          <canvas id="gTheta" width="220" height="110" class="w-full"></canvas>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/60 p-2">
+          <div class="mb-1 text-[11px] font-bold text-violet-400">Angular Accel α (rad/s²)</div>
+          <canvas id="gAlpha" width="220" height="110" class="w-full"></canvas>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/60 p-2">
+          <div class="mb-1 text-[11px] font-bold text-amber-400">Torque τ (N·m)</div>
+          <canvas id="gTorque" width="220" height="110" class="w-full"></canvas>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/60 p-2">
+          <div class="mb-1 text-[11px] font-bold text-rose-400">Rotational KE (J)</div>
+          <canvas id="gKE" width="220" height="110" class="w-full"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- STUDENT LEARNING PANEL + PREDICTION CHALLENGE + REAL-WORLD GALLERY -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <section class="glass-card rounded-2xl p-4 shadow-lg lg:col-span-2">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/40 pb-2">
+          <h3 class="text-sm font-extrabold uppercase tracking-wider text-sky-400">
+            🎓 Student Learning Guide &amp; Prediction Challenge
+          </h3>
+          <span class="rounded-full bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-bold text-violet-300">
+            Interactive Concept Mode
+          </span>
+        </div>
+        <div id="learningContent" class="space-y-3 text-xs leading-relaxed"></div>
+      </section>
+
+      <section class="glass-card rounded-2xl p-4 shadow-lg">
+        <h3 class="mb-3 border-b border-slate-700/40 pb-2 text-sm font-extrabold uppercase tracking-wider text-amber-400">
+          🌍 Real-World Applications
+        </h3>
+        <div id="appGalleryButtons" class="mb-3 flex flex-wrap gap-1.5"></div>
+        <div id="appGalleryDetail" class="rounded-xl border border-slate-700/40 bg-slate-950/50 p-3 text-xs leading-relaxed"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // =========================================================================
+    // EXPERIMENT METADATA & EDUCATIONAL CONTENT (ALL 10 EXPERIMENTS)
+    // =========================================================================
+    const EXPERIMENTS = [
+      { id: "disc", name: "1. Rotating Disc", sub: "Angular kinematics (θ, ω), tangential speed v = rω, and radial acceleration aₙ = rω²" },
+      { id: "torque", name: "2. Torque & Moment", sub: "Lever arm & wheel torque τ = rF sinθ, clockwise vs anticlockwise rotation" },
+      { id: "inertia", name: "3. Moment of Inertia", sub: "Compare Solid Disc (½MR²), Ring (MR²), and Solid Sphere (⅖MR²) under torque" },
+      { id: "angmom", name: "4. Angular Momentum", sub: "Angular momentum L = Iω, radius/mass distribution, and rotational inertia" },
+      { id: "conservation", name: "5. Conservation of L", sub: "Pulling weights inward decreases I and speeds up rotation: I₁ω₁ = I₂ω₂" },
+      { id: "rolling", name: "6. Rolling Motion", sub: "Ramp race comparing Solid Sphere, Hollow Sphere, Solid Cylinder, Ring & Hollow Cylinder" },
+      { id: "rotke", name: "7. Rotational KE", sub: "Work W = τθ, power P = τω, rotational kinetic energy ½Iω², and friction loss" },
+      { id: "gyroscope", name: "8. Gyroscope", sub: "Spinning rotor, angular momentum L, applied torque τ, and gyroscopic precession Ω = τ / L" },
+      { id: "flywheel", name: "9. Flywheel", sub: "High-inertia energy storage flywheel smoothing speed fluctuations under load" },
+      { id: "equilibrium", name: "10. Rotational Equilibrium", sub: "Balance clockwise and anticlockwise torques: Στ = r₁F₁ sinθ₁ − r₂F₂ sinθ₂ = 0" }
+    ];
+
+    const LEARNING_DATA = {
+      disc: {
+        obs: "A metallic disc rotates about a fixed central axis with glowing rim markers, tangential velocity v, and inward radial acceleration aₙ.",
+        physics: "Every point on a rigid disc shares the same angular velocity ω, while linear speed v = rω increases proportionally with distance r from the centre.",
+        defs: "Angular displacement (θ) is angle swept in radians; angular velocity (ω) is rate of change of θ; centripetal acceleration (aₙ) keeps points moving in a circle.",
+        formulas: "θ = θ₀ + ωt  |  ω = dθ/dt  |  v = rω  |  aₙ = rω²",
+        apps: "CDs/DVDs, circular saw blades, potter's wheel, and turntable platters.",
+        paramTip: "Doubling radius r doubles tangential speed v at the same ω, while doubling ω quadruples centripetal acceleration aₙ.",
+        misconception: "Points near the edge do NOT have a larger angular velocity ω than inner points—they have the same ω but larger linear speed v = rω.",
+        challenge: {
+          q: "If angular velocity ω is doubled at a fixed radius r, what happens to radial acceleration aₙ = rω²?",
+          opts: ["Doubles (2×)", "Quadruples (4×)", "Stays the same"],
+          ans: 1,
+          explain: "Because aₙ is proportional to ω², doubling ω multiplies aₙ by 2² = 4."
+        },
+        mcqs: [
+          "1. A point at r = 2m has ω = 3 rad/s. Its tangential speed is 6 m/s.",
+          "2. Radial acceleration always points toward the centre of the circular path.",
+          "3. One full revolution equals 2π radians (≈ 6.283 rad)."
+        ]
+      },
+      torque: {
+        obs: "A force F acts on a pivoted lever/wheel at distance r and angle θ, producing clockwise or anticlockwise torque.",
+        physics: "Torque measures the rotational effectiveness of a force. Only the component perpendicular to the position vector (F sinθ) creates angular acceleration.",
+        defs: "Torque (τ) is the moment of force; lever arm (r⊥ = r sinθ) is the perpendicular distance from pivot to line of action of force.",
+        formulas: "τ = rF sinθ  |  τ = Iα",
+        apps: "Wrenches opening tight nuts, door handles placed far from hinges, and seesaws.",
+        paramTip: "Moving force application closer to the pivot (smaller r) or pushing straight toward/away from the pivot (θ = 0° or 180°) reduces torque to zero.",
+        misconception: "A large force always produces large torque—even a huge force produces zero torque if its line of action passes through the pivot (θ = 0°).",
+        challenge: {
+          q: "At what angle θ between radius vector r and force F is torque maximum for fixed r and F?",
+          opts: ["θ = 0°", "θ = 45°", "θ = 90°"],
+          ans: 2,
+          explain: "sin(90°) = 1 is the maximum value of sine, giving maximum torque τ = rF."
+        },
+        mcqs: [
+          "1. Pushing a door right at the hinge gives r = 0, so τ = 0 N·m.",
+          "2. Pulling at θ = 90° gives maximum rotational turning effect.",
+          "3. Reversing force direction flips clockwise torque to anticlockwise."
+        ]
+      },
+      inertia: {
+        obs: "Different rigid bodies—Solid Disc, Ring, and Solid Sphere—accelerate differently under the same applied torque.",
+        physics: "Moment of inertia I is rotational mass. Mass concentrated farther from the axis (like a ring) gives higher I and slower angular acceleration α = τ/I.",
+        defs: "Moment of inertia (I = Σmr²) quantifies resistance to change in rotational state.",
+        formulas: "Disc: I = ½MR²  |  Ring: I = MR²  |  Sphere: I = ⅖MR²  |  α = τ/I",
+        apps: "Spoked bicycle wheels vs solid flywheels, and figure skaters tucking limbs.",
+        paramTip: "Increasing radius R increases I by R²—doubling R quadruples moment of inertia!",
+        misconception: "Moment of inertia depends only on mass—actually, how mass is distributed relative to the axis matters just as much.",
+        challenge: {
+          q: "With equal mass M and radius R, which object has the largest moment of inertia about its central axis?",
+          opts: ["Solid Disc (½MR²)", "Thin Ring (MR²)", "Solid Sphere (⅖MR²)"],
+          ans: 1,
+          explain: "All mass of a thin ring lies at maximum distance R from the axis, giving I = MR²."
+        },
+        mcqs: [
+          "1. Larger moment of inertia means smaller angular acceleration for the same torque.",
+          "2. Doubling radius R increases I by a factor of 4.",
+          "3. SI unit of moment of inertia is kg·m²."
+        ]
+      },
+      angmom: {
+        obs: "A spinning system displays its angular momentum vector L = Iω along the rotation axis.",
+        physics: "Angular momentum is the rotational analogue of linear momentum p = mv, combining rotational inertia I and angular velocity ω.",
+        defs: "Angular momentum (L = Iω) measures quantity of rotational motion about an axis.",
+        formulas: "L = Iω  |  τ_net = dL/dt",
+        apps: "Spinning tops, planets orbiting the Sun, and helicopter tail/main rotors.",
+        paramTip: "Increasing mass or radial distance increases L for a given ω.",
+        misconception: "Angular momentum is zero when an object moves in a straight line—a particle moving in a straight line can still have non-zero angular momentum about an off-line point.",
+        challenge: {
+          q: "If both I and ω are doubled, angular momentum L = Iω becomes:",
+          opts: ["2×", "4×", "8×"],
+          ans: 1,
+          explain: "L = (2I)(2ω) = 4Iω, so it becomes 4 times larger."
+        },
+        mcqs: [
+          "1. SI unit of angular momentum is kg·m²/s (or J·s).",
+          "2. Zero net external torque keeps angular momentum constant.",
+          "3. L points along the axis given by the right-hand rule."
+        ]
+      },
+      conservation: {
+        obs: "A figure on a rotating stool pulls weights inward or extends them outward, causing spin speed ω to change automatically.",
+        physics: "With negligible friction (net external torque ≈ 0), angular momentum is conserved: I₁ω₁ = I₂ω₂. Pulling weights inward lowers I, forcing ω up!",
+        defs: "Conservation of angular momentum states L_initial = L_final when net external torque is zero.",
+        formulas: "I₁ω₁ = I₂ω₂  ⇒  ω₂ = ω₁(I₁ / I₂)",
+        apps: "Ice skaters pulling arms in for fast spins, divers tucking mid-air, and gymnasts.",
+        paramTip: "Pulling weights inward reduces r, shrinking I = Σmr² and accelerating the spin.",
+        misconception: "When the skater spins faster after pulling arms in, angular momentum increased—false! L stays constant while KE_rot increases from muscular work.",
+        challenge: {
+          q: "When the figure pulls weights inward so I drops to half (I₂ = 0.5I₁), what happens to ω?",
+          opts: ["ω doubles (2ω₁)", "ω halves (0.5ω₁)", "ω stays ω₁"],
+          ans: 0,
+          explain: "From I₁ω₁ = (0.5I₁)ω₂, we get ω₂ = 2ω₁."
+        },
+        mcqs: [
+          "1. Smaller radius r → smaller I → larger ω when L is conserved.",
+          "2. Extending weights outward slows the rotation.",
+          "3. Rotational KE = ½Iω² can change even when L is conserved."
+        ]
+      },
+      rolling: {
+        obs: "Five round shapes race down an inclined ramp under gravity without slipping.",
+        physics: "Gravitational potential energy mgh converts into both translational KE (½mv²) and rotational KE (½Iω²). A smaller I/mR² ratio gives faster acceleration down the incline.",
+        defs: "Pure rolling satisfies v = Rω at the point of contact with zero slipping.",
+        formulas: "v = Rω  |  KE_total = ½mv² + ½Iω²  |  a = (g sinθ) / (1 + I/mR²)",
+        apps: "Rolling balls, wheels, pipes, and bowling balls.",
+        paramTip: "Steeper ramp angle θ increases g sinθ so all objects accelerate faster, while solid objects beat hollow ones of equal mass and radius.",
+        misconception: "Heavier objects always roll down a frictionless-slip ramp faster—actually, acceleration depends on shape factor I/(mR²) and angle θ, independent of mass m!",
+        challenge: {
+          q: "In a pure rolling race down the same ramp, which wins between a Solid Sphere and a Thin Ring?",
+          opts: ["Solid Sphere", "Thin Ring", "Tie"],
+          ans: 0,
+          explain: "Solid sphere has I/(mR²) = 2/5 = 0.4, whereas a ring has 1.0, giving the solid sphere greater acceleration."
+        },
+        mcqs: [
+          "1. Rolling kinetic energy has two parts: translational and rotational.",
+          "2. Pure rolling requires v = Rω.",
+          "3. Lower moment of inertia fraction gives a faster roll down the slope."
+        ]
+      },
+      rotke: {
+        obs: "Torque does rotational work W = τθ on a rotor, building rotational kinetic energy KE_rot = ½Iω² while friction dissipates heat.",
+        physics: "Work done by torque equals the change in rotational kinetic energy minus thermal losses.",
+        defs: "Rotational kinetic energy is energy due to rotation; rotational power P = τω is the rate of doing rotational work.",
+        formulas: "KE_rot = ½Iω²  |  W = τθ  |  P = τω",
+        apps: "Electric motor shafts, turbine rotors, and wind generators.",
+        paramTip: "Higher torque τ or longer angular displacement θ increases work W = τθ and final ω.",
+        misconception: "Power is the same as work—power is work divided by time (P = τω).",
+        challenge: {
+          q: "If angular speed ω triples for a fixed moment of inertia I, rotational KE = ½Iω² increases by:",
+          opts: ["3×", "6×", "9×"],
+          ans: 2,
+          explain: "3² = 9, so rotational kinetic energy becomes 9 times greater."
+        },
+        mcqs: [
+          "1. Rotational KE is measured in Joules (J).",
+          "2. Power P = τω is measured in Watts (W).",
+          "3. Friction converts mechanical energy into heat."
+        ]
+      },
+      gyroscope: {
+        obs: "A spinning gyroscope wheel precesses horizontally instead of toppling straight down under gravity.",
+        physics: "Gravity creates a horizontal torque τ perpendicular to angular momentum L. The change dL = τdt turns the direction of L smoothly, producing precession Ω = τ/L.",
+        defs: "Precession is the slow circular cone-like motion of a spinning axis under external torque.",
+        formulas: "L = Iω_spin  |  τ = mgr  |  Ω_precession = τ / L",
+        apps: "Aircraft attitude indicators, smartphones, spacecraft stabilization, and bicycles.",
+        paramTip: "Increasing spin speed ω_spin increases L, making precession slower and more stable!",
+        misconception: "Gravity pulls the spinning gyroscope straight down like a non-spinning top—instead, its axis precesses sideways because τ = dL/dt.",
+        challenge: {
+          q: "If you spin the gyroscope faster (larger L) for the same torque τ, what happens to precession rate Ω = τ/L?",
+          opts: ["Precession slows down (smaller Ω)", "Precession speeds up (larger Ω)", "Precession stops completely"],
+          ans: 0,
+          explain: "Since Ω = τ/L, a larger angular momentum L means a smaller precession angular speed Ω."
+        },
+        mcqs: [
+          "1. Precession happens because torque changes the direction of L.",
+          "2. Faster spin makes a gyroscope resist tilting more strongly.",
+          "3. Precession angular velocity is Ω = τ / L."
+        ]
+      },
+      flywheel: {
+        obs: "A heavy high-inertia flywheel stores kinetic energy and resists sudden drops in angular velocity.",
+        physics: "Because KE = ½Iω², a large moment of inertia I stores substantial energy and keeps rotation smooth even when intermittent torque loads occur.",
+        defs: "A flywheel is a rotational energy reservoir used to smooth out power pulses.",
+        formulas: "I = ½MR²  |  KE = ½Iω²  |  Δω = (τ_net · Δt) / I",
+        apps: "Car engines, punch presses, regenerative energy systems, and locomotives.",
+        paramTip: "Increasing flywheel mass M or outer rim radius R boosts stored energy and reduces speed ripple.",
+        misconception: "A flywheel creates extra energy from nothing—it only stores and releases mechanical energy.",
+        challenge: {
+          q: "Why do heavy flywheels keep engines running smoothly between power strokes?",
+          opts: ["High moment of inertia I resists rapid changes in ω", "They eliminate gravity", "They make ω infinite"],
+          ans: 0,
+          explain: "From α = τ/I, large moment of inertia I keeps angular acceleration small during load fluctuations."
+        },
+        mcqs: [
+          "1. Flywheels store energy as rotational kinetic energy.",
+          "2. Rim-heavy wheels have large moment of inertia.",
+          "3. Larger I reduces speed fluctuations for a given torque impulse."
+        ]
+      },
+      equilibrium: {
+        obs: "Two forces pull on opposite sides of a balanced beam/pulley; students can adjust forces and lever arms to achieve Στ = 0.",
+        physics: "Rotational equilibrium occurs when net torque is zero: clockwise torque equals anticlockwise torque.",
+        defs: "Rotational equilibrium means Στ = 0, so angular acceleration α = 0.",
+        formulas: "Στ = τ₁ − τ₂ = r₁F₁ sinθ₁ − r₂F₂ sinθ₂ = 0",
+        apps: "Balance scales, crane booms, seesaws, and bridge trusses.",
+        paramTip: "A smaller force at a larger distance can balance a larger force at a smaller distance.",
+        misconception: "Equal forces always balance rotation—distances r and angles θ also determine torque.",
+        challenge: {
+          q: "A 20 N force at r₁ = 3 m pulls anticlockwise. What force at r₂ = 2 m (θ₂ = 90°) balances it?",
+          opts: ["10 N", "30 N", "60 N"],
+          ans: 1,
+          explain: "20 × 3 = 60 N·m; F₂ × 2 = 60 ⇒ F₂ = 30 N."
+        },
+        mcqs: [
+          "1. Στ = 0 is the condition for rotational equilibrium.",
+          "2. Clockwise and anticlockwise torques cancel when equal in magnitude.",
+          "3. Lever arm matters just as much as force magnitude."
+        ]
+      }
+    };
+
+    const REAL_WORLD_APPS = [
+      { name: "Bicycle Wheels", desc: "Thin spokes and rim concentrate mass near the outer edge, increasing moment of inertia for gyroscopic stability while keeping weight low." },
+      { name: "Car Wheels", desc: "Torque from the engine axle applies rotational force to wheels; static friction with the road pushes the car forward without slipping (v = Rω)." },
+      { name: "Ceiling Fans", desc: "Electromagnetic torque accelerates fan blades to steady angular speed ω, moving air downward via blade pitch angle." },
+      { name: "Washing Machine Drums", desc: "High-speed spin cycles generate large radial acceleration aₙ = rω² to push water outward through drum perforations." },
+      { name: "Electric Motors", desc: "Current-carrying coils in a magnetic field experience magnetic torque τ = NIAB sinθ, converting electrical energy into rotational work." },
+      { name: "Wind Turbines", desc: "Wind lifts turbine blades to generate aerodynamic torque τ, driving a generator shaft to produce electrical power P = τω." },
+      { name: "Ferris Wheels", desc: "Large radius r means even a modest angular speed ω gives cabins significant tangential speed v = rω and centripetal acceleration." },
+      { name: "Helicopter Rotors", desc: "Main rotor blades spin at high ω for lift, while a tail rotor provides counter-torque to prevent the fuselage from spinning opposite to L." },
+      { name: "Gyroscopes", desc: "High-spin rotors maintain orientation and precess at Ω = τ/L under external torque—vital for navigation and stabilization." },
+      { name: "Sports Spinning Objects", desc: "Spinning basketballs, cricket balls, and figure skaters demonstrate angular momentum L = Iω and Magnus/rotational dynamics." }
+    ];
+
+    // =========================================================================
+    // SIMULATION STATE
+    // =========================================================================
+    const simState = {
+      expId: "disc",
+      isPlaying: true,
+      speed: 1.0,
+      simTime: 0.0,
+      zoom: 1.0,
+      selectedAppIdx: 0,
+      graphsVisible: true,
+      challengePicked: null,
+
+      // Vector toggles
+      vectors: {
+        omega: true,
+        tangentialV: true,
+        radialA: true,
+        torque: true,
+        angMom: true,
+        alpha: true
+      },
+
+      // Exp 1: Rotating Disc
+      disc: { omega: 3.0, radius: 130, mass: 4.0, dir: 1, theta: 0.4 },
+
+      // Exp 2: Torque & Moment of Force
+      torque: { rFrac: 0.75, force: 35, angleDeg: 90, armAngle: -0.35, omega: 0, alpha: 0, inertia: 2.5 },
+
+      // Exp 3: Moment of Inertia Comparison
+      inertia: { shape: "disc", mass: 5.0, radius: 110, torque: 18, omega: 0, alpha: 0, theta: 0 },
+
+      // Exp 4: Angular Momentum
+      angmom: { mass: 3.0, radiusFrac: 0.7, omega: 4.0, theta: 0 },
+
+      // Exp 5: Conservation of Angular Momentum (Rotating Chair)
+      conservation: { pullFactor: 0.2, chairTheta: 0, omega: 2.0, baseI: 1.2, weightMass: 2.5 },
+
+      // Exp 6: Rolling Motion Race
+      rolling: { selectedShape: "solid_sphere", rampAngleDeg: 22, mass: 3.0, radius: 34, startFrac: 0.08, friction: 0.3, progress: 0, vLin: 0, omega: 0 },
+
+      // Exp 7: Rotational Kinetic Energy
+      rotke: { inertia: 3.0, torque: 16, frictionTorque: 3.0, omega: 1.5, theta: 0, workDone: 0, heatLoss: 0 },
+
+      // Exp 8: Gyroscope
+      gyro: { spinSpeed: 14, torqueMag: 18, mass: 3.0, pivotDist: 1.2, spinAngle: 0, precessionAngle: 0 },
+
+      // Exp 9: Flywheel
+      flywheel: { mass: 8.0, radius: 135, driveTorque: 24, loadTorque: 8, omega: 3.0, theta: 0 },
+
+      // Exp 10: Rotational Equilibrium
+      equilibrium: { f1: 30, r1: 120, ang1: 90, f2: 30, r2: 120, ang2: 90, tilt: 0, omega: 0 },
+
+      // Graph histories
+      history: {
+        t: [],
+        omega: [],
+        theta: [],
+        alpha: [],
+        torque: [],
+        ke: []
+      }
+    };
+
+    // =========================================================================
+    // INITIALIZATION & UI BUILDERS
+    // =========================================================================
+    function initLab() {
+      buildExperimentTabs();
+      buildVectorToggles();
+      buildAppGallery();
+      selectExperiment("disc");
+      requestAnimationFrame(mainLoop);
+    }
+
+    function buildExperimentTabs() {
+      const container = document.getElementById("experimentTabs");
+      container.innerHTML = EXPERIMENTS.map((exp) => {
+        const active = exp.id === simState.expId;
+        return `
+          <button
+            id="tab-${exp.id}"
+            onclick="selectExperiment('${exp.id}')"
+            class="shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition ${
+              active
+                ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20"
+                : "glass-card opacity-80 hover:opacity-100"
+            }"
+          >
+            ${exp.name}
+          </button>
+        `;
+      }).join("");
+    }
+
+    function buildVectorToggles() {
+      const defs = [
+        { key: "omega", label: "ω Angular Vel.", color: "text-emerald-400" },
+        { key: "tangentialV", label: "v Tangential", color: "text-sky-400" },
+        { key: "radialA", label: "aₙ Radial", color: "text-amber-400" },
+        { key: "torque", label: "τ Torque", color: "text-rose-400" },
+        { key: "angMom", label: "L Ang. Mom.", color: "text-violet-400" },
+        { key: "alpha", label: "α Ang. Accel.", color: "text-cyan-400" }
+      ];
+      const box = document.getElementById("vectorToggles");
+      box.innerHTML = defs.map((d) => `
+        <label class="flex cursor-pointer items-center gap-1.5 rounded-lg bg-slate-900/40 px-2 py-1">
+          <input type="checkbox" ${simState.vectors[d.key] ? "checked" : ""} onchange="simState.vectors['${d.key}'] = this.checked" class="h-3.5 w-3.5 rounded" />
+          <span class="font-semibold ${d.color}">${d.label}</span>
+        </label>
+      `).join("");
+    }
+
+    function toggleAllVectors() {
+      const vals = Object.values(simState.vectors);
+      const next = !vals.every(Boolean);
+      Object.keys(simState.vectors).forEach((k) => (simState.vectors[k] = next));
+      buildVectorToggles();
+    }
+
+    function selectExperiment(id) {
+      simState.expId = id;
+      simState.challengePicked = null;
+      const meta = EXPERIMENTS.find((e) => e.id === id);
+      document.getElementById("expTitle").textContent = meta.name;
+      document.getElementById("expSubtitle").textContent = meta.sub;
+
+      EXPERIMENTS.forEach((e) => {
+        const btn = document.getElementById(`tab-${e.id}`);
+        if (!btn) return;
+        btn.className = e.id === id
+          ? "shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20"
+          : "shrink-0 rounded-xl px-3 py-2 text-xs font-bold transition glass-card opacity-80 hover:opacity-100";
+      });
+
+      resetCurrentExperiment(false);
+      buildDynamicControls();
+      renderLearningPanel();
+    }
+
+    function resetCurrentExperiment(keepPlaying = true) {
+      simState.simTime = 0;
+      simState.history = { t: [], omega: [], theta: [], alpha: [], torque: [], ke: [] };
+
+      simState.disc.theta = 0.4;
+      simState.torque.omega = 0;
+      simState.torque.alpha = 0;
+      simState.inertia.omega = 0;
+      simState.inertia.alpha = 0;
+      simState.inertia.theta = 0;
+      simState.angmom.theta = 0;
+      simState.conservation.chairTheta = 0;
+      simState.conservation.omega = 2.0;
+      simState.rolling.progress = 0;
+      simState.rolling.vLin = 0;
+      simState.rolling.omega = 0;
+      simState.rotke.omega = 1.5;
+      simState.rotke.theta = 0;
+      simState.rotke.workDone = 0;
+      simState.rotke.heatLoss = 0;
+      simState.gyro.spinAngle = 0;
+      simState.gyro.precessionAngle = 0;
+      simState.flywheel.omega = 3.0;
+      simState.flywheel.theta = 0;
+      simState.equilibrium.tilt = 0;
+      simState.equilibrium.omega = 0;
+
+      if (keepPlaying) {
+        simState.isPlaying = true;
+        document.getElementById("btnPlayPause").textContent = "Ⅱ Pause";
+      }
+    }
+
+    function togglePlay() {
+      simState.isPlaying = !simState.isPlaying;
+      document.getElementById("btnPlayPause").textContent = simState.isPlaying ? "Ⅱ Pause" : "▶ Play";
+    }
+
+    function stepForward() {
+      simState.isPlaying = false;
+      document.getElementById("btnPlayPause").textContent = "▶ Play";
+      stepPhysics(0.03);
+    }
+
+    function adjustZoom(delta) {
+      simState.zoom = Math.max(0.6, Math.min(1.6, Number((simState.zoom + delta).toFixed(2))));
+      document.getElementById("txtZoom").textContent = `${Math.round(simState.zoom * 100)}%`;
+    }
+
+    function resetZoom() {
+      simState.zoom = 1.0;
+      document.getElementById("txtZoom").textContent = "100%";
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light-theme");
+    }
+
+    function toggleFullscreenLab() {
+      const el = document.getElementById("labRoot");
+      if (!document.fullscreenElement) {
+        el.requestFullscreen?.().catch(() => {});
+      } else {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    }
+
+    function toggleGraphsSection() {
+      simState.graphsVisible = !simState.graphsVisible;
+      document.getElementById("graphsGrid").classList.toggle("hidden", !simState.graphsVisible);
+    }
+
+    // =========================================================================
+    // DYNAMIC SLIDERS & SELECTORS PER EXPERIMENT
+    // =========================================================================
+    function sliderRow(label, id, min, max, step, val, unit, onChangeCode) {
+      return `
+        <div>
+          <div class="mb-1 flex justify-between font-semibold">
+            <span>${label}</span>
+            <span id="lbl-${id}" class="font-mono text-sky-400">${val}${unit}</span>
+          </div>
+          <input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="${onChangeCode}" class="w-full" />
+        </div>
+      `;
+    }
+
+    function buildDynamicControls() {
+      const box = document.getElementById("dynamicControls");
+      const id = simState.expId;
+
+      if (id === "disc") {
+        const d = simState.disc;
+        box.innerHTML =
+          sliderRow("Angular Velocity (ω)", "sDiscOmega", 0.5, 10, 0.2, d.omega, " rad/s", "simState.disc.omega=parseFloat(this.value);document.getElementById('lbl-sDiscOmega').textContent=this.value+' rad/s'") +
+          sliderRow("Disc Radius (r)", "sDiscR", 60, 165, 5, d.radius, " px", "simState.disc.radius=parseFloat(this.value);document.getElementById('lbl-sDiscR').textContent=this.value+' px'") +
+          sliderRow("Disc Mass (m)", "sDiscM", 1, 15, 0.5, d.mass, " kg", "simState.disc.mass=parseFloat(this.value);document.getElementById('lbl-sDiscM').textContent=this.value+' kg'") +
+          `<div class="flex items-center justify-between pt-1">
+            <span class="font-semibold">Rotation Direction</span>
+            <button onclick="simState.disc.dir*=-1;buildDynamicControls()" class="rounded-lg bg-sky-500/20 px-3 py-1 font-bold text-sky-300 ring-1 ring-sky-400/30">
+              ${d.dir > 0 ? "↻ Anticlockwise (+)" : "↺ Clockwise (−)"}
+            </button>
+          </div>`;
+      } else if (id === "torque") {
+        const t = simState.torque;
+        box.innerHTML =
+          sliderRow("Force Magnitude (F)", "sTorF", 5, 80, 1, t.force, " N", "simState.torque.force=parseFloat(this.value);document.getElementById('lbl-sTorF').textContent=this.value+' N'") +
+          sliderRow("Position Along Arm (r/R)", "sTorR", 0.2, 1.0, 0.05, t.rFrac, "", "simState.torque.rFrac=parseFloat(this.value);document.getElementById('lbl-sTorR').textContent=Number(this.value).toFixed(2)") +
+          sliderRow("Force Angle (θ)", "sTorAng", 0, 180, 5, t.angleDeg, "°", "simState.torque.angleDeg=parseFloat(this.value);document.getElementById('lbl-sTorAng').textContent=this.value+'°'");
+      } else if (id === "inertia") {
+        const i = simState.inertia;
+        box.innerHTML = `
+          <div>
+            <label class="mb-1 block font-semibold">Rigid Body Shape</label>
+            <select onchange="simState.inertia.shape=this.value" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-bold text-sky-300">
+              <option value="disc" ${i.shape === "disc" ? "selected" : ""}>Solid Disc (I = ½MR²)</option>
+              <option value="ring" ${i.shape === "ring" ? "selected" : ""}>Thin Ring / Hoop (I = MR²)</option>
+              <option value="sphere" ${i.shape === "sphere" ? "selected" : ""}>Solid Sphere (I = ⅖MR²)</option>
+            </select>
+          </div>` +
+          sliderRow("Mass (M)", "sInM", 1, 15, 0.5, i.mass, " kg", "simState.inertia.mass=parseFloat(this.value);document.getElementById('lbl-sInM').textContent=this.value+' kg'") +
+          sliderRow("Radius (R)", "sInR", 50, 150, 5, i.radius, " px", "simState.inertia.radius=parseFloat(this.value);document.getElementById('lbl-sInR').textContent=this.value+' px'") +
+          sliderRow("Applied Torque (τ)", "sInT", 2, 50, 1, i.torque, " N·m", "simState.inertia.torque=parseFloat(this.value);document.getElementById('lbl-sInT').textContent=this.value+' N·m'");
+      } else if (id === "angmom") {
+        const a = simState.angmom;
+        box.innerHTML =
+          sliderRow("Angular Velocity (ω)", "sAmW", 0.5, 10, 0.2, a.omega, " rad/s", "simState.angmom.omega=parseFloat(this.value);document.getElementById('lbl-sAmW').textContent=this.value+' rad/s'") +
+          sliderRow("Mass (m)", "sAmM", 1, 12, 0.5, a.mass, " kg", "simState.angmom.mass=parseFloat(this.value);document.getElementById('lbl-sAmM').textContent=this.value+' kg'") +
+          sliderRow("Radius Distribution (r/R)", "sAmR", 0.3, 1.0, 0.05, a.radiusFrac, "", "simState.angmom.radiusFrac=parseFloat(this.value);document.getElementById('lbl-sAmR').textContent=Number(this.value).toFixed(2)");
+      } else if (id === "conservation") {
+        const c = simState.conservation;
+        box.innerHTML =
+          sliderRow("Pull Weights Inward (0 = Out, 1 = In)", "sConP", 0, 1, 0.02, c.pullFactor, "", "simState.conservation.pullFactor=parseFloat(this.value);document.getElementById('lbl-sConP').textContent=Math.round(this.value*100)+'% In'") +
+          sliderRow("Weight Mass (each)", "sConM", 0.5, 6, 0.5, c.weightMass, " kg", "simState.conservation.weightMass=parseFloat(this.value);document.getElementById('lbl-sConM').textContent=this.value+' kg'") +
+          sliderRow("Initial Spin (ω₁)", "sConW", 0.5, 6, 0.2, c.omega, " rad/s", "simState.conservation.omega=parseFloat(this.value);document.getElementById('lbl-sConW').textContent=this.value+' rad/s'");
+      } else if (id === "rolling") {
+        const r = simState.rolling;
+        box.innerHTML = `
+          <div>
+            <label class="mb-1 block font-semibold">Rolling Object</label>
+            <select onchange="simState.rolling.selectedShape=this.value;simState.rolling.progress=0" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-bold text-sky-300">
+              <option value="solid_sphere" ${r.selectedShape === "solid_sphere" ? "selected" : ""}>Solid Sphere (I = ⅖mR²)</option>
+              <option value="solid_cylinder" ${r.selectedShape === "solid_cylinder" ? "selected" : ""}>Solid Cylinder (I = ½mR²)</option>
+              <option value="hollow_sphere" ${r.selectedShape === "hollow_sphere" ? "selected" : ""}>Hollow Sphere (I = ⅔mR²)</option>
+              <option value="ring" ${r.selectedShape === "ring" ? "selected" : ""}>Thin Ring / Hoop (I = mR²)</option>
+              <option value="hollow_cylinder" ${r.selectedShape === "hollow_cylinder" ? "selected" : ""}>Hollow Cylinder (I ≈ 0.8mR²)</option>
+            </select>
+          </div>` +
+          sliderRow("Ramp Angle (θ)", "sRolA", 8, 45, 1, r.rampAngleDeg, "°", "simState.rolling.rampAngleDeg=parseFloat(this.value);document.getElementById('lbl-sRolA').textContent=this.value+'°'") +
+          sliderRow("Mass (m)", "sRolM", 1, 10, 0.5, r.mass, " kg", "simState.rolling.mass=parseFloat(this.value);document.getElementById('lbl-sRolM').textContent=this.value+' kg'") +
+          sliderRow("Radius (R)", "sRolR", 20, 48, 2, r.radius, " px", "simState.rolling.radius=parseFloat(this.value);document.getElementById('lbl-sRolR').textContent=this.value+' px'");
+      } else if (id === "rotke") {
+        const k = simState.rotke;
+        box.innerHTML =
+          sliderRow("Applied Torque (τ)", "sKeT", 0, 50, 1, k.torque, " N·m", "simState.rotke.torque=parseFloat(this.value);document.getElementById('lbl-sKeT').textContent=this.value+' N·m'") +
+          sliderRow("Friction Torque (τ_f)", "sKeF", 0, 20, 0.5, k.frictionTorque, " N·m", "simState.rotke.frictionTorque=parseFloat(this.value);document.getElementById('lbl-sKeF').textContent=this.value+' N·m'") +
+          sliderRow("Moment of Inertia (I)", "sKeI", 1, 10, 0.5, k.inertia, " kg·m²", "simState.rotke.inertia=parseFloat(this.value);document.getElementById('lbl-sKeI').textContent=this.value+' kg·m²'");
+      } else if (id === "gyroscope") {
+        const g = simState.gyro;
+        box.innerHTML =
+          sliderRow("Rotor Spin Speed (ω_s)", "sGyrS", 4, 30, 1, g.spinSpeed, " rad/s", "simState.gyro.spinSpeed=parseFloat(this.value);document.getElementById('lbl-sGyrS').textContent=this.value+' rad/s'") +
+          sliderRow("Torque Magnitude (τ)", "sGyrT", 5, 45, 1, g.torqueMag, " N·m", "simState.gyro.torqueMag=parseFloat(this.value);document.getElementById('lbl-sGyrT').textContent=this.value+' N·m'") +
+          sliderRow("Rotor Mass (m)", "sGyrM", 1, 10, 0.5, g.mass, " kg", "simState.gyro.mass=parseFloat(this.value);document.getElementById('lbl-sGyrM').textContent=this.value+' kg'") +
+          sliderRow("Pivot Distance (d)", "sGyrD", 0.5, 2.2, 0.1, g.pivotDist, " m", "simState.gyro.pivotDist=parseFloat(this.value);document.getElementById('lbl-sGyrD').textContent=Number(this.value).toFixed(1)+' m'");
+      } else if (id === "flywheel") {
+        const f = simState.flywheel;
+        box.innerHTML =
+          sliderRow("Flywheel Mass (M)", "sFlyM", 2, 20, 1, f.mass, " kg", "simState.flywheel.mass=parseFloat(this.value);document.getElementById('lbl-sFlyM').textContent=this.value+' kg'") +
+          sliderRow("Drive Torque (τ_in)", "sFlyIn", 0, 60, 2, f.driveTorque, " N·m", "simState.flywheel.driveTorque=parseFloat(this.value);document.getElementById('lbl-sFlyIn').textContent=this.value+' N·m'") +
+          sliderRow("Load Torque (τ_load)", "sFlyOut", 0, 50, 2, f.loadTorque, " N·m", "simState.flywheel.loadTorque=parseFloat(this.value);document.getElementById('lbl-sFlyOut').textContent=this.value+' N·m'");
+      } else if (id === "equilibrium") {
+        const eq = simState.equilibrium;
+        box.innerHTML =
+          sliderRow("Left Force (F₁)", "sEqF1", 5, 80, 1, eq.f1, " N", "simState.equilibrium.f1=parseFloat(this.value);document.getElementById('lbl-sEqF1').textContent=this.value+' N'") +
+          sliderRow("Left Lever Arm (r₁)", "sEqR1", 40, 180, 5, eq.r1, " px", "simState.equilibrium.r1=parseFloat(this.value);document.getElementById('lbl-sEqR1').textContent=this.value+' px'") +
+          sliderRow("Right Force (F₂)", "sEqF2", 5, 80, 1, eq.f2, " N", "simState.equilibrium.f2=parseFloat(this.value);document.getElementById('lbl-sEqF2').textContent=this.value+' N'") +
+          sliderRow("Right Lever Arm (r₂)", "sEqR2", 40, 180, 5, eq.r2, " px", "simState.equilibrium.r2=parseFloat(this.value);document.getElementById('lbl-sEqR2').textContent=this.value+' px'");
+      }
+    }
+
+    // =========================================================================
+    // PHYSICS STEP & TELEMETRY COMPUTATION
+    // =========================================================================
+    function computeMetrics() {
+      const id = simState.expId;
+      let theta = 0, omega = 0, alpha = 0, torque = 0, inertia = 1, angMom = 0, keRot = 0, vTan = 0, aRad = 0, extraLabel = "—";
+
+      if (id === "disc") {
+        const d = simState.disc;
+        const rMeters = d.radius / 100;
+        theta = d.theta;
+        omega = d.dir * d.omega;
+        alpha = 0;
+        torque = 0;
+        inertia = 0.5 * d.mass * rMeters * rMeters;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rMeters * Math.abs(omega);
+        aRad = rMeters * omega * omega;
+        extraLabel = `${(d.radius).toFixed(0)} px (${rMeters.toFixed(2)} m)`;
+      } else if (id === "torque") {
+        const t = simState.torque;
+        const rM = t.rFrac * 1.6;
+        const radAng = (t.angleDeg * Math.PI) / 180;
+        torque = rM * t.force * Math.sin(radAng);
+        inertia = t.inertia;
+        alpha = torque / inertia;
+        omega = t.omega;
+        theta = t.armAngle;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rM * Math.abs(omega);
+        aRad = rM * omega * omega;
+        extraLabel = torque >= 0 ? "Anticlockwise (+)" : "Clockwise (−)";
+      } else if (id === "inertia") {
+        const i = simState.inertia;
+        const rM = i.radius / 100;
+        const factor = i.shape === "ring" ? 1.0 : i.shape === "sphere" ? 0.4 : 0.5;
+        inertia = factor * i.mass * rM * rM;
+        torque = i.torque;
+        alpha = torque / Math.max(0.01, inertia);
+        omega = i.omega;
+        theta = i.theta;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rM * Math.abs(omega);
+        aRad = rM * omega * omega;
+        extraLabel = i.shape.replace("_", " ").toUpperCase();
+      } else if (id === "angmom") {
+        const a = simState.angmom;
+        const rM = a.radiusFrac * 1.4;
+        inertia = a.mass * rM * rM;
+        omega = a.omega;
+        theta = a.theta;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rM * Math.abs(omega);
+        aRad = rM * omega * omega;
+        extraLabel = `${rM.toFixed(2)} m`;
+      } else if (id === "conservation") {
+        const c = simState.conservation;
+        const rOuter = 1.2;
+        const rCurr = rOuter * (1 - 0.65 * c.pullFactor);
+        const iCurr = c.baseI + 2 * c.weightMass * rCurr * rCurr;
+        const iInit = c.baseI + 2 * c.weightMass * rOuter * rOuter;
+        const lConst = iInit * c.omega;
+        omega = lConst / Math.max(0.1, iCurr);
+        inertia = iCurr;
+        angMom = lConst;
+        theta = c.chairTheta;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rCurr * Math.abs(omega);
+        aRad = rCurr * omega * omega;
+        extraLabel = `I₁=${iInit.toFixed(2)} → I₂=${iCurr.toFixed(2)}`;
+      } else if (id === "rolling") {
+        const r = simState.rolling;
+        const rM = r.radius / 100;
+        const mapFactor = {
+          solid_sphere: 0.4,
+          solid_cylinder: 0.5,
+          hollow_sphere: 2 / 3,
+          ring: 1.0,
+          hollow_cylinder: 0.8
+        };
+        const kFac = mapFactor[r.selectedShape] || 0.5;
+        inertia = kFac * r.mass * rM * rM;
+        const angRad = (r.rampAngleDeg * Math.PI) / 180;
+        const aLin = (9.8 * Math.sin(angRad)) / (1 + kFac);
+        alpha = aLin / Math.max(0.02, rM);
+        vTan = r.vLin;
+        omega = r.omega;
+        theta = r.progress * 8;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega + 0.5 * r.mass * vTan * vTan;
+        aRad = rM * omega * omega;
+        extraLabel = `${(r.progress * 100).toFixed(0)}% down ramp`;
+      } else if (id === "rotke") {
+        const k = simState.rotke;
+        inertia = k.inertia;
+        const netT = k.torque - Math.sign(k.omega || 1) * k.frictionTorque;
+        torque = netT;
+        alpha = netT / inertia;
+        omega = k.omega;
+        theta = k.theta;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = Math.abs(omega);
+        aRad = omega * omega;
+        extraLabel = `W=${k.workDone.toFixed(1)}J | Q=${k.heatLoss.toFixed(1)}J`;
+      } else if (id === "gyroscope") {
+        const g = simState.gyro;
+        const rRotor = 0.45;
+        inertia = 0.5 * g.mass * rRotor * rRotor;
+        const lSpin = inertia * g.spinSpeed;
+        const tauPrec = g.mass * 9.8 * g.pivotDist * (g.torqueMag / 20);
+        const omegaPrec = tauPrec / Math.max(0.05, lSpin);
+        omega = omegaPrec;
+        alpha = 0;
+        torque = tauPrec;
+        angMom = lSpin;
+        theta = g.precessionAngle;
+        keRot = 0.5 * inertia * g.spinSpeed * g.spinSpeed;
+        vTan = g.pivotDist * omegaPrec;
+        aRad = g.pivotDist * omegaPrec * omegaPrec;
+        extraLabel = `Spin ${g.spinSpeed.toFixed(0)} rad/s`;
+      } else if (id === "flywheel") {
+        const f = simState.flywheel;
+        const rM = f.radius / 100;
+        inertia = 0.5 * f.mass * rM * rM;
+        torque = f.driveTorque - f.loadTorque;
+        alpha = torque / inertia;
+        omega = f.omega;
+        theta = f.theta;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = rM * Math.abs(omega);
+        aRad = rM * omega * omega;
+        extraLabel = `Net τ = ${torque.toFixed(1)} N·m`;
+      } else if (id === "equilibrium") {
+        const eq = simState.equilibrium;
+        const tau1 = (eq.r1 / 100) * eq.f1 * Math.sin((eq.ang1 * Math.PI) / 180);
+        const tau2 = (eq.r2 / 100) * eq.f2 * Math.sin((eq.ang2 * Math.PI) / 180);
+        torque = tau1 - tau2;
+        inertia = 2.0;
+        alpha = torque / inertia;
+        omega = eq.omega;
+        theta = eq.tilt;
+        angMom = inertia * omega;
+        keRot = 0.5 * inertia * omega * omega;
+        vTan = 1.2 * Math.abs(omega);
+        aRad = 1.2 * omega * omega;
+        extraLabel = Math.abs(torque) < 0.05 ? "BALANCED (Στ = 0)" : "UNBALANCED";
+      }
+
+      return { theta, omega, alpha, torque, inertia, angMom, keRot, vTan, aRad, extraLabel };
+    }
+
+    function stepPhysics(dt) {
+      simState.simTime += dt;
+      const id = simState.expId;
+
+      if (id === "disc") {
+        simState.disc.theta += simState.disc.dir * simState.disc.omega * dt;
+      } else if (id === "torque") {
+        const t = simState.torque;
+        const tau = (t.rFrac * 1.6) * t.force * Math.sin((t.angleDeg * Math.PI) / 180);
+        t.alpha = tau / t.inertia;
+        t.omega = Math.max(-10, Math.min(10, t.omega + t.alpha * dt - t.omega * 0.25 * dt));
+        t.armAngle += t.omega * dt;
+      } else if (id === "inertia") {
+        const i = simState.inertia;
+        const rM = i.radius / 100;
+        const factor = i.shape === "ring" ? 1.0 : i.shape === "sphere" ? 0.4 : 0.5;
+        const I = Math.max(0.01, factor * i.mass * rM * rM);
+        i.alpha = i.torque / I;
+        i.omega = Math.min(18, i.omega + i.alpha * dt);
+        i.theta += i.omega * dt;
+      } else if (id === "angmom") {
+        simState.angmom.theta += simState.angmom.omega * dt;
+      } else if (id === "conservation") {
+        const c = simState.conservation;
+        const rOuter = 1.2;
+        const rCurr = rOuter * (1 - 0.65 * c.pullFactor);
+        const iCurr = c.baseI + 2 * c.weightMass * rCurr * rCurr;
+        const iInit = c.baseI + 2 * c.weightMass * rOuter * rOuter;
+        c.omega = (iInit * c.omega) / Math.max(0.1, iCurr);
+        c.chairTheta += c.omega * dt;
+      } else if (id === "rolling") {
+        const r = simState.rolling;
+        const rM = Math.max(0.15, r.radius / 100);
+        const mapFactor = { solid_sphere: 0.4, solid_cylinder: 0.5, hollow_sphere: 2 / 3, ring: 1.0, hollow_cylinder: 0.8 };
+        const kFac = mapFactor[r.selectedShape] || 0.5;
+        const aLin = (9.8 * Math.sin((r.rampAngleDeg * Math.PI) / 180)) / (1 + kFac);
+        r.vLin = Math.min(16, r.vLin + aLin * dt * 2.2);
+        r.omega = r.vLin / rM;
+        r.progress += (r.vLin * dt) / 14;
+        if (r.progress >= 1) {
+          r.progress = 0;
+          r.vLin = 0;
+          r.omega = 0;
+        }
+      } else if (id === "rotke") {
+        const k = simState.rotke;
+        const netT = k.torque - Math.sign(k.omega || 1) * k.frictionTorque;
+        const alpha = netT / k.inertia;
+        const prevTheta = k.theta;
+        k.omega = Math.max(0, Math.min(18, k.omega + alpha * dt));
+        k.theta += k.omega * dt;
+        const dTheta = k.theta - prevTheta;
+        k.workDone += k.torque * dTheta;
+        k.heatLoss += k.frictionTorque * dTheta;
+      } else if (id === "gyroscope") {
+        const g = simState.gyro;
+        const rRotor = 0.45;
+        const I = 0.5 * g.mass * rRotor * rRotor;
+        const L = Math.max(0.05, I * g.spinSpeed);
+        const tau = g.mass * 9.8 * g.pivotDist * (g.torqueMag / 20);
+        const omegaPrec = tau / L;
+        g.spinAngle += g.spinSpeed * dt;
+        g.precessionAngle += omegaPrec * dt;
+      } else if (id === "flywheel") {
+        const f = simState.flywheel;
+        const rM = f.radius / 100;
+        const I = Math.max(0.05, 0.5 * f.mass * rM * rM);
+        const netT = f.driveTorque - f.loadTorque;
+        f.omega = Math.max(0, Math.min(16, f.omega + (netT / I) * dt));
+        f.theta += f.omega * dt;
+      } else if (id === "equilibrium") {
+        const eq = simState.equilibrium;
+        const tau1 = (eq.r1 / 100) * eq.f1 * Math.sin((eq.ang1 * Math.PI) / 180);
+        const tau2 = (eq.r2 / 100) * eq.f2 * Math.sin((eq.ang2 * Math.PI) / 180);
+        const netTau = tau1 - tau2;
+        eq.omega = (eq.omega + (netTau / 2.0) * dt) * 0.96;
+        eq.tilt = Math.max(-0.35, Math.min(0.35, eq.tilt + eq.omega * dt));
+      }
+
+      const m = computeMetrics();
+      const h = simState.history;
+      h.t.push(simState.simTime);
+      h.omega.push(m.omega);
+      h.theta.push(m.theta);
+      h.alpha.push(m.alpha);
+      h.torque.push(m.torque);
+      h.ke.push(m.keRot);
+      if (h.t.length > 140) {
+        Object.keys(h).forEach((k) => h[k].shift());
+      }
+    }
+
+    // =========================================================================
+    // CANVAS RENDERING FOR ALL 10 EXPERIMENTS
+    // =========================================================================
+    const canvas = document.getElementById("simCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function drawArrow2D(x1, y1, x2, y2, color, label) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 4) return;
+      const ang = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 9 * Math.cos(ang - 0.38), y2 - 9 * Math.sin(ang - 0.38));
+      ctx.lineTo(x2 - 9 * Math.cos(ang + 0.38), y2 - 9 * Math.sin(ang + 0.38));
+      ctx.closePath();
+      ctx.fill();
+
+      if (label) {
+        ctx.font = "bold 11px monospace";
+        ctx.fillText(label, x2 + 6, y2 - 4);
+      }
+      ctx.restore();
+    }
+
+    function renderSimulation(metrics) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Deep Navy Futuristic Lab Background
+      const grad = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.45, 40, canvas.width * 0.5, canvas.height * 0.5, 680);
+      grad.addColorStop(0, "#112240");
+      grad.addColorStop(1, "#060b14");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Subtle Lab Grid
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.06)";
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < canvas.width; gx += 40) {
+        ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke();
+      }
+      for (let gy = 0; gy < canvas.height; gy += 40) {
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke();
+      }
+
+      ctx.save();
+      const cx = canvas.width * 0.5;
+      const cy = canvas.height * 0.52;
+      ctx.translate(cx, cy);
+      ctx.scale(simState.zoom, simState.zoom);
+      ctx.translate(-cx, -cy);
+
+      const id = simState.expId;
+
+      if (id === "disc") {
+        const d = simState.disc;
+        const r = d.radius;
+        // Glowing outer orbit ring
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI * 2); ctx.stroke();
+
+        // 3D-shaded metallic disc
+        const discGrad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, 10, cx, cy, r);
+        discGrad.addColorStop(0, "#60a5fa");
+        discGrad.addColorStop(0.55, "#1d4ed8");
+        discGrad.addColorStop(1, "#0f172a");
+        ctx.fillStyle = discGrad;
+        ctx.strokeStyle = "#93c5fd";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Rotating radial markings
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-d.theta);
+        for (let k = 0; k < 6; k++) {
+          ctx.rotate(Math.PI / 3);
+          ctx.strokeStyle = k === 0 ? "#facc15" : "rgba(255,255,255,0.35)";
+          ctx.lineWidth = k === 0 ? 3 : 1.5;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0); ctx.stroke();
+        }
+        ctx.restore();
+
+        // Centre hub
+        ctx.fillStyle = "#f8fafc";
+        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+
+        // Rim marker point & vectors
+        const px = cx + r * Math.cos(-d.theta);
+        const py = cy + r * Math.sin(-d.theta);
+        ctx.fillStyle = "#f43f5e";
+        ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
+
+        if (simState.vectors.tangentialV) {
+          const tx = -Math.sin(-d.theta) * d.dir;
+          const ty = Math.cos(-d.theta) * d.dir;
+          const vLen = Math.min(110, metrics.vTan * 35);
+          drawArrow2D(px, py, px + tx * vLen, py + ty * vLen, "#38bdf8", `v=${metrics.vTan.toFixed(1)}m/s`);
+        }
+        if (simState.vectors.radialA) {
+          const toCenterX = (cx - px) / r;
+          const toCenterY = (cy - py) / r;
+          const aLen = Math.min(95, metrics.aRad * 4.5);
+          drawArrow2D(px, py, px + toCenterX * aLen, py + toCenterY * aLen, "#fbbf24", `aₙ=${metrics.aRad.toFixed(1)}`);
+        }
+        if (simState.vectors.omega) {
+          drawArrow2D(cx, cy, cx, cy - Math.min(120, d.omega * 14), "#34d399", `ω=${metrics.omega.toFixed(1)} rad/s`);
+        }
+      } else if (id === "torque") {
+        const t = simState.torque;
+        const armLen = 175;
+        const rPos = t.rFrac * armLen;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-t.armAngle);
+
+        // Lever bar
+        ctx.fillStyle = "#334155";
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(-20, -9, armLen + 25, 18, 6); ctx.fill(); ctx.stroke();
+
+        // Force application point
+        const angRad = (t.angleDeg * Math.PI) / 180;
+        const fLen = 45 + t.force * 1.1;
+        const fx = Math.cos(-angRad) * fLen;
+        const fy = Math.sin(-angRad) * fLen;
+
+        if (simState.vectors.torque) {
+          drawArrow2D(rPos, 0, rPos + fx, fy, "#fb7185", `F=${t.force}N`);
+        }
+
+        // Pivot pin
+        ctx.fillStyle = "#facc15";
+        ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Torque meter gauge card on canvas
+        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+        ctx.fillRect(24, 24, 220, 68);
+        ctx.strokeStyle = "#38bdf8";
+        ctx.strokeRect(24, 24, 220, 68);
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 12px monospace";
+        ctx.fillText(`TORQUE τ = ${metrics.torque.toFixed(2)} N·m`, 36, 48);
+        ctx.fillStyle = metrics.torque >= 0 ? "#34d399" : "#fb7185";
+        ctx.fillText(`Dir: ${metrics.extraLabel}`, 36, 72);
+      } else if (id === "inertia") {
+        const i = simState.inertia;
+        const r = i.radius;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-i.theta);
+
+        if (i.shape === "ring") {
+          ctx.strokeStyle = "#38bdf8";
+          ctx.lineWidth = 14;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        } else if (i.shape === "sphere") {
+          const sg = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 8, 0, 0, r);
+          sg.addColorStop(0, "#a78bfa");
+          sg.addColorStop(1, "#4c1d95");
+          ctx.fillStyle = sg;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#ddd6fe"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+        } else {
+          const dg = ctx.createRadialGradient(-r * 0.25, -r * 0.25, 10, 0, 0, r);
+          dg.addColorStop(0, "#34d399");
+          dg.addColorStop(1, "#065f46");
+          ctx.fillStyle = dg;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0); ctx.stroke();
+        ctx.restore();
+
+        if (simState.vectors.alpha) {
+          drawArrow2D(cx, cy, cx + 90, cy - 55, "#22d3ee", `α=${metrics.alpha.toFixed(2)} rad/s²`);
+        }
+      } else if (id === "angmom" || id === "conservation") {
+        const isCon = id === "conservation";
+        const theta = isCon ? simState.conservation.chairTheta : simState.angmom.theta;
+        const rDraw = isCon
+          ? 145 * (1 - 0.65 * simState.conservation.pullFactor)
+          : 145 * simState.angmom.radiusFrac;
+
+        // Stool base
+        ctx.fillStyle = "#1e293b";
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(cx, cy + 40, 155, 42, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Rotating weights & arms
+        const lx = cx - rDraw * Math.cos(theta);
+        const ly = cy + 15 + rDraw * 0.28 * Math.sin(theta);
+        const rx = cx + rDraw * Math.cos(theta);
+        const ry = cy + 15 - rDraw * 0.28 * Math.sin(theta);
+
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(rx, ry); ctx.stroke();
+
+        // Figure torso & head
+        ctx.fillStyle = "#6366f1";
+        ctx.beginPath(); ctx.roundRect(cx - 18, cy - 35, 36, 52, 10); ctx.fill();
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath(); ctx.arc(cx, cy - 50, 15, 0, Math.PI * 2); ctx.fill();
+
+        // Weights
+        [lx, rx].forEach((wx, idx) => {
+          const wy = idx === 0 ? ly : ry;
+          ctx.fillStyle = "#f43f5e";
+          ctx.beginPath(); ctx.arc(wx, wy, 13, 0, Math.PI * 2); ctx.fill();
+        });
+
+        if (simState.vectors.angMom) {
+          drawArrow2D(cx, cy - 55, cx, cy - 155, "#a78bfa", `L=${metrics.angMom.toFixed(2)}`);
+        }
+      } else if (id === "rolling") {
+        const r = simState.rolling;
+        const rad = (r.rampAngleDeg * Math.PI) / 180;
+        const startX = cx - 280, startY = cy - 95;
+        const endX = cx + 290, endY = startY + Math.tan(rad) * 570;
+
+        // Inclined Ramp
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+
+        const bx = startX + (endX - startX) * r.progress;
+        const by = startY + (endY - startY) * r.progress;
+        const nx = -Math.sin(rad) * r.radius;
+        const ny = -Math.cos(rad) * r.radius;
+
+        ctx.save();
+        ctx.translate(bx + nx, by + ny);
+        ctx.rotate(r.progress * 12);
+        ctx.fillStyle = "#38bdf8";
+        ctx.strokeStyle = "#e0f2fe";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, r.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(-r.radius, 0); ctx.lineTo(r.radius, 0); ctx.stroke();
+        ctx.restore();
+
+        if (simState.vectors.tangentialV) {
+          drawArrow2D(bx + nx, by + ny, bx + nx + Math.cos(rad) * (20 + r.vLin * 7), by + ny + Math.sin(rad) * (20 + r.vLin * 7), "#34d399", `v=${r.vLin.toFixed(1)}m/s`);
+        }
+      } else if (id === "rotke") {
+        const k = simState.rotke;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-k.theta);
+        ctx.fillStyle = "#1e3a8a";
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, 0, 115, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#facc15"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(115, 0); ctx.stroke();
+        ctx.restore();
+        if (simState.vectors.torque) {
+          drawArrow2D(cx, cy, cx + 125, cy - 30, "#fb7185", `τ_net=${metrics.torque.toFixed(1)}N·m`);
+        }
+      } else if (id === "gyroscope") {
+        const g = simState.gyro;
+        const armPx = 150 * (g.pivotDist / 1.5);
+        const gx = cx + armPx * Math.cos(g.precessionAngle);
+        const gy = cy + armPx * 0.35 * Math.sin(g.precessionAngle);
+
+        // Stand & arm
+        ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(cx, cy + 90); ctx.lineTo(cx, cy); ctx.lineTo(gx, gy); ctx.stroke();
+
+        // Spinning rotor
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.rotate(g.spinAngle);
+        ctx.strokeStyle = "#38bdf8"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.ellipse(0, 0, 44, 16, 0.4, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+
+        if (simState.vectors.angMom) {
+          drawArrow2D(gx, gy, gx + 75 * Math.cos(g.precessionAngle), gy - 45, "#a78bfa", "L");
+        }
+        if (simState.vectors.torque) {
+          drawArrow2D(gx, gy, gx - 55 * Math.sin(g.precessionAngle), gy + 35, "#fb7185", "τ");
+        }
+      } else if (id === "flywheel") {
+        const f = simState.flywheel;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-f.theta);
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 18;
+        ctx.beginPath(); ctx.arc(0, 0, f.radius, 0, Math.PI * 2); ctx.stroke();
+        for (let s = 0; s < 4; s++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(f.radius, 0); ctx.stroke();
+        }
+        ctx.restore();
+      } else if (id === "equilibrium") {
+        const eq = simState.equilibrium;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-eq.tilt);
+        ctx.fillStyle = "#334155"; ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 2;
+        ctx.fillRect(-200, -8, 400, 16); ctx.strokeRect(-200, -8, 400, 16);
+
+        drawArrow2D(-eq.r1, -8, -eq.r1, -8 - eq.f1 * 1.4, "#34d399", `F₁=${eq.f1}N`);
+        drawArrow2D(eq.r2, -8, eq.r2, -8 - eq.f2 * 1.4, "#fb7185", `F₂=${eq.f2}N`);
+        ctx.restore();
+
+        // Fulcrum
+        ctx.fillStyle = "#facc15";
+        ctx.beginPath(); ctx.moveTo(cx, cy + 8); ctx.lineTo(cx - 18, cy + 40); ctx.lineTo(cx + 18, cy + 40); ctx.closePath(); ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // TELEMETRY CARDS, EQUATIONS, GRAPHS, LEARNING & APPLICATIONS
+    // =========================================================================
+    function renderTelemetryAndEquations(m) {
+      const cards = [
+        { k: "Angle (θ)", v: `${m.theta.toFixed(2)} rad`, c: "text-sky-400" },
+        { k: "Ang. Velocity (ω)", v: `${m.omega.toFixed(2)} rad/s`, c: "text-emerald-400" },
+        { k: "Ang. Accel (α)", v: `${m.alpha.toFixed(2)} rad/s²`, c: "text-cyan-400" },
+        { k: "Torque (τ)", v: `${m.torque.toFixed(2)} N·m`, c: "text-rose-400" },
+        { k: "Inertia (I)", v: `${m.inertia.toFixed(3)} kg·m²`, c: "text-indigo-400" },
+        { k: "Ang. Momentum (L)", v: `${m.angMom.toFixed(2)} kg·m²/s`, c: "text-violet-400" },
+        { k: "Rotational KE", v: `${m.keRot.toFixed(2)} J`, c: "text-amber-400" },
+        { k: "Tangential v / aₙ", v: `${m.vTan.toFixed(2)}m/s | ${m.aRad.toFixed(1)}m/s²`, c: "text-slate-200" }
+      ];
+
+      document.getElementById("telemetryGrid").innerHTML = cards.map((c) => `
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/50 p-2.5">
+          <div class="text-[10px] font-bold uppercase opacity-70">${c.k}</div>
+          <div class="mt-1 font-mono text-sm font-extrabold ${c.c}">${c.v}</div>
+        </div>
+      `).join("");
+
+      const data = LEARNING_DATA[simState.expId];
+      document.getElementById("equationsPanel").innerHTML = `
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/50 p-2.5">
+          <div class="text-[10px] font-bold uppercase text-sky-400">Governing Relations</div>
+          <div class="mt-1 font-bold">${data.formulas}</div>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/50 p-2.5">
+          <div class="text-[10px] font-bold uppercase text-emerald-400">Live Numerical Evaluation</div>
+          <div class="mt-1">L = I·ω = ${m.inertia.toFixed(2)} × ${m.omega.toFixed(2)} = <strong>${m.angMom.toFixed(2)} kg·m²/s</strong></div>
+          <div>KE_rot = ½·I·ω² = <strong>${m.keRot.toFixed(2)} J</strong></div>
+        </div>
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/50 p-2.5">
+          <div class="text-[10px] font-bold uppercase text-amber-400">Experiment Status</div>
+          <div class="mt-1">${m.extraLabel}</div>
+        </div>
+      `;
+    }
+
+    function drawMiniGraph(canvasId, arr, strokeColor) {
+      const c = document.getElementById(canvasId);
+      const gctx = c.getContext("2d");
+      gctx.clearRect(0, 0, c.width, c.height);
+      if (arr.length < 2) return;
+
+      const minV = Math.min(...arr, 0);
+      const maxV = Math.max(...arr, 1);
+      const span = Math.max(1e-4, maxV - minV);
+
+      gctx.strokeStyle = strokeColor;
+      gctx.lineWidth = 2;
+      gctx.beginPath();
+      arr.forEach((val, idx) => {
+        const x = (idx / (arr.length - 1)) * (c.width - 12) + 6;
+        const y = c.height - 10 - ((val - minV) / span) * (c.height - 20);
+        if (idx === 0) gctx.moveTo(x, y);
+        else gctx.lineTo(x, y);
+      });
+      gctx.stroke();
+    }
+
+    function renderGraphs() {
+      const h = simState.history;
+      drawMiniGraph("gOmega", h.omega, "#34d399");
+      drawMiniGraph("gTheta", h.theta, "#38bdf8");
+      drawMiniGraph("gAlpha", h.alpha, "#a78bfa");
+      drawMiniGraph("gTorque", h.torque, "#fbbf24");
+      drawMiniGraph("gKE", h.ke, "#fb7185");
+    }
+
+    function renderLearningPanel() {
+      const d = LEARNING_DATA[simState.expId];
+      const ch = d.challenge;
+      const picked = simState.challengePicked;
+
+      document.getElementById("learningContent").innerHTML = `
+        <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+          <div class="rounded-xl border border-slate-700/40 bg-slate-950/40 p-2.5">
+            <strong class="text-sky-400">1. What Are We Observing?</strong><br/>${d.obs}
+          </div>
+          <div class="rounded-xl border border-slate-700/40 bg-slate-950/40 p-2.5">
+            <strong class="text-emerald-400">2. Physics Behind It:</strong><br/>${d.physics}
+          </div>
+          <div class="rounded-xl border border-slate-700/40 bg-slate-950/40 p-2.5">
+            <strong class="text-amber-400">3. Key Definitions &amp; Formulas:</strong><br/>${d.defs}<br/><code class="text-sky-300">${d.formulas}</code>
+          </div>
+          <div class="rounded-xl border border-slate-700/40 bg-slate-950/40 p-2.5">
+            <strong class="text-rose-400">4. Parameter Effects &amp; Misconceptions:</strong><br/>${d.paramTip} <em>${d.misconception}</em>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-700/40 bg-slate-950/40 p-2.5">
+          <strong class="text-violet-400">5. Quick Concept Checkpoints:</strong>
+          <div class="mt-1 grid grid-cols-1 gap-1 sm:grid-cols-3">${d.mcqs.map((q) => `<div>${q}</div>`).join("")}</div>
+        </div>
+
+        <div class="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
+          <div class="font-extrabold text-sky-300">🎯 Prediction Challenge: ${ch.q}</div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            ${ch.opts.map((opt, idx) => `
+              <button onclick="pickChallenge(${idx})" class="rounded-lg border border-sky-400/40 bg-slate-900/70 px-3 py-1 font-bold hover:bg-sky-500/20">
+                ${opt}
+              </button>
+            `).join("")}
+          </div>
+          ${picked !== null ? `
+            <div class="mt-2 font-semibold ${picked === ch.ans ? "text-emerald-400" : "text-amber-300"}">
+              ${picked === ch.ans ? "✓ Correct!" : "Not quite —"} ${ch.explain}
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function pickChallenge(idx) {
+      simState.challengePicked = idx;
+      renderLearningPanel();
+    }
+
+    function buildAppGallery() {
+      const btns = document.getElementById("appGalleryButtons");
+      btns.innerHTML = REAL_WORLD_APPS.map((a, idx) => `
+        <button onclick="selectApp(${idx})" class="rounded-lg border border-slate-700/50 bg-slate-900/50 px-2.5 py-1 text-[11px] font-bold hover:border-sky-400">
+          ${a.name}
+        </button>
+      `).join("");
+      selectApp(0);
+    }
+
+    function selectApp(idx) {
+      simState.selectedAppIdx = idx;
+      const app = REAL_WORLD_APPS[idx];
+      document.getElementById("appGalleryDetail").innerHTML = `
+        <div class="font-extrabold text-sky-400">${app.name}</div>
+        <p class="mt-1 opacity-85">${app.desc}</p>
+      `;
+    }
+
+    // =========================================================================
+    // MAIN REQUESTANIMATIONFRAME LOOP
+    // =========================================================================
+    let lastTs = performance.now();
+    function mainLoop(now) {
+      const dt = Math.min(0.05, (now - lastTs) / 1000);
+      lastTs = now;
+
+      if (simState.isPlaying) {
+        stepPhysics(dt * simState.speed);
+      }
+
+      const metrics = computeMetrics();
+      document.getElementById("txtSimTime").textContent = `t = ${simState.simTime.toFixed(2)} s`;
+      renderSimulation(metrics);
+      renderTelemetryAndEquations(metrics);
+      renderGraphs();
+
+      requestAnimationFrame(mainLoop);
+    }
+
+    initLab();
+  </script>
+</body>
+</html>
